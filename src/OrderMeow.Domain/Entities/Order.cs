@@ -9,4 +9,5 @@ public class Order
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public OrderStatus Status { get; set; } =  OrderStatus.Created;
     public Guid UserId { get; set; }
+    public  User User { get; set; }
 }
