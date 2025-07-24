@@ -27,7 +27,7 @@ public class AuthController: ControllerBase
         var token = await _userService.LoginAsync(loginDto);
         return Ok(new
         {
-            access_token = token.Token, 
+            access_token = token.AccessToken, 
             token_type = "Bearer"
         });
     }
