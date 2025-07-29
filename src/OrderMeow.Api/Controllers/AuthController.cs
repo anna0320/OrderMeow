@@ -9,10 +9,12 @@ namespace OrderMeow.Controllers;
 public class AuthController: ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IJwtService _jwtService;
 
-    public AuthController(IUserService userService)
+    public AuthController(IUserService userService, IJwtService jwtService)
     {
         _userService = userService;
+        _jwtService = jwtService;
     }
     [AllowAnonymous]
     [HttpPost("register")]
@@ -30,5 +32,11 @@ public class AuthController: ControllerBase
             access_token = token.AccessToken, 
             token_type = "Bearer"
         });
+    }
+    [HttpPost("refresh-token")]
+    public async Task<IActionResult> RefreshToken([FromBody] TokenDto tokens)
+    {
+        var newTokens = await _jwtService.RefreshTokenPairAsync(tokens);
+        return Ok(newTokens);
     }
 }
