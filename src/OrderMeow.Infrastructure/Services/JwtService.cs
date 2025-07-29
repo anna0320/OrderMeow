@@ -5,11 +5,11 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using OrderMeow.App.Interfaces;
-using OrderMeow.Domain.Entities;
+using OrderMeow.Core.DTO.Auth;
+using OrderMeow.Core.Entities;
+using OrderMeow.Core.Interfaces;
+using OrderMeow.Infrastructure.Config;
 using OrderMeow.Infrastructure.Persistence;
-using OrderMeow.Shared.Config;
-using OrderMeow.Shared.DTO.Auth;
 
 namespace OrderMeow.Infrastructure.Services;
 

@@ -2,9 +2,9 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using OrderMeow.App.Interfaces;
-using OrderMeow.Shared.Config;
-using OrderMeow.Shared.Messages;
+using OrderMeow.Core.Interfaces;
+using OrderMeow.Infrastructure.Config;
+using OrderMeow.Infrastructure.Messages;
 using RabbitMQ.Client;
 
 

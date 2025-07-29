@@ -1,9 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <ItemGroup>
-      <ProjectReference Include="..\OrderMeow.App\OrderMeow.App.csproj" />
-      <ProjectReference Include="..\OrderMeow.Domain\OrderMeow.Domain.csproj" />
-      <ProjectReference Include="..\OrderMeow.Shared\OrderMeow.Shared.csproj" />
+      <ProjectReference Include="..\OrderMeow.Core\OrderMeow.Core.csproj" />
     </ItemGroup>
 
     <ItemGroup>

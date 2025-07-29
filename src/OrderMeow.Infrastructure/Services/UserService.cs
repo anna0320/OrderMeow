@@ -1,10 +1,10 @@
 using System.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using OrderMeow.App.Interfaces;
-using OrderMeow.Domain.Entities;
+using OrderMeow.Core.DTO.Auth;
+using OrderMeow.Core.Entities;
+using OrderMeow.Core.Interfaces;
 using OrderMeow.Infrastructure.Persistence;
-using OrderMeow.Shared.DTO.Auth;
 
 namespace OrderMeow.Infrastructure.Services;
 

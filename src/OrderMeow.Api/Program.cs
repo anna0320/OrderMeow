@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using OrderMeow.App.Interfaces;
+using OrderMeow.Core.Interfaces;
+using OrderMeow.Infrastructure.Config;
 using OrderMeow.Infrastructure.Persistence;
 using OrderMeow.Infrastructure.Services;
-using OrderMeow.Shared.Config;
 
 var builder = WebApplication.CreateBuilder(args);
 

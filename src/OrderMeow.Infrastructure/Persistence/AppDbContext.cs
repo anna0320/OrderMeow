@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using OrderMeow.Domain.Entities;
+using OrderMeow.Core.Entities;
 
 namespace OrderMeow.Infrastructure.Persistence;
 

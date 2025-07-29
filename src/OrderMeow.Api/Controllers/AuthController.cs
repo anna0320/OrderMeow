@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrderMeow.App.Interfaces;
-using OrderMeow.Shared.DTO.Auth;
+using OrderMeow.Core.DTO.Auth;
+using OrderMeow.Core.Interfaces;
 
 namespace OrderMeow.Controllers;
 [ApiController]

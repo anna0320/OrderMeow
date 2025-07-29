@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using OrderMeow.App.Interfaces;
-using OrderMeow.Domain.Entities;
-using OrderMeow.Domain.Enums;
+using OrderMeow.Core.DTO;
+using OrderMeow.Core.Entities;
+using OrderMeow.Core.Enums;
+using OrderMeow.Core.Interfaces;
+using OrderMeow.Infrastructure.Messages;
 using OrderMeow.Infrastructure.Persistence;
-using OrderMeow.Shared.DTO;
-using OrderMeow.Shared.Messages;
 
 namespace OrderMeow.Infrastructure.Services;
 

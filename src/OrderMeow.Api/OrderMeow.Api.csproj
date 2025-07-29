@@ -15,9 +15,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\OrderMeow.App\OrderMeow.App.csproj" />
+      <ProjectReference Include="..\OrderMeow.Core\OrderMeow.Core.csproj" />
       <ProjectReference Include="..\OrderMeow.Infrastructure\OrderMeow.Infrastructure.csproj" />
-      <ProjectReference Include="..\OrderMeow.Shared\OrderMeow.Shared.csproj" />
     </ItemGroup>
 
 </Project>

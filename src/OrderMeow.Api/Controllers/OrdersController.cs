@@ -1,10 +1,8 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using OrderMeow.App.DTO;
-using OrderMeow.App.Interfaces;
-using OrderMeow.Shared.DTO;
+using OrderMeow.Core.DTO;
+using OrderMeow.Core.Interfaces;
 
 namespace OrderMeow.Controllers;
 [ApiController]
