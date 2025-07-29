@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using OrderMeow.Core.Entities;
+using OrderMeow.Core.Enums;
 using OrderMeow.Core.Interfaces;
 using OrderMeow.Infrastructure.Config;
 using OrderMeow.Infrastructure.Persistence;
@@ -63,6 +65,12 @@ builder.Services.AddAuthentication(options =>
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("UserOrAdmin", policy => 
+        policy.RequireRole(nameof(RoleType.User), nameof(RoleType.Admin)));
+});
+
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
@@ -104,6 +112,21 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (!dbContext.Users.Any(u => u.Role == RoleType.Admin))
+    {
+        dbContext.Users.Add(new User
+        {
+            Username = "admin",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("secureAdminPassword"),
+            Role = RoleType.Admin
+        });
+        await dbContext.SaveChangesAsync();
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {

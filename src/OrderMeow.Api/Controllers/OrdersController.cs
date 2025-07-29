@@ -33,6 +33,8 @@ public class OrdersController: ControllerBase
         var id = await _orderService.CreateOrderAsync(order,  GetUserId());
         return Ok(new { id });
     }
+    
+    [Authorize(Policy = "UserOrAdmin")]
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -61,6 +63,7 @@ public class OrdersController: ControllerBase
         return NoContent();
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPatch("{id:guid}/status")]
     public async Task<IActionResult> ChangeOrderStatus(Guid id, UpdateOrderStatusDto status)
     {

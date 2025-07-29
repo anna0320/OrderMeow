@@ -30,7 +30,8 @@ public class JwtService: IJwtService
         {
             Subject = new ClaimsIdentity([
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.UniqueName, user.Username)
+                new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+                new Claim(ClaimTypes.Role, user.Role.ToString())
             ]),
             Issuer = _jwtSettings.Issuer,
             Audience = _jwtSettings.Audience,
@@ -83,6 +84,12 @@ public class JwtService: IJwtService
                            .AsNoTracking()
                            .FirstOrDefaultAsync(u => u.Id == userIdGuid)
                        ?? throw new SecurityTokenException("User not found");
+            
+            var tokenRole = principal.FindFirst(ClaimTypes.Role)?.Value;
+            if (user.Role.ToString() != tokenRole)
+            {
+                throw new SecurityTokenException("Role mismatch");
+            }
             
             var storedRefreshToken = await _dbContext.RefreshTokens
                                          .FirstOrDefaultAsync(rt => 

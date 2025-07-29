@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OrderMeow.Core.DTO.Auth;
 using OrderMeow.Core.Entities;
+using OrderMeow.Core.Enums;
 using OrderMeow.Core.Interfaces;
 using OrderMeow.Infrastructure.Persistence;
 
@@ -47,6 +48,7 @@ public class UserService : IUserService
         {
             Username = registerDto.Username.Trim(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
+            Role = RoleType.User
         };
         
         var refreshToken = await _jwtService.GenerateRefreshTokenAsync(user);
