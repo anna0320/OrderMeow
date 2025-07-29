@@ -23,6 +23,7 @@ public class AppDbContext: DbContext
             .WithMany(u=>u.RefreshTokens)
             .HasForeignKey(rt=>rt.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+        
         base.OnModelCreating(modelBuilder);
     }
 }

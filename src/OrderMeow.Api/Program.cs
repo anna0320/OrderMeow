@@ -65,8 +65,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IMessageQueueService, RabbitMqService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>

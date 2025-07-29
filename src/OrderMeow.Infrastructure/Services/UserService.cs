@@ -1,3 +1,4 @@
+using System.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OrderMeow.App.Interfaces;
@@ -10,101 +11,121 @@ namespace OrderMeow.Infrastructure.Services;
 public class UserService : IUserService
 {
     private readonly AppDbContext _dbContext;
-    private readonly ITokenService _tokenService;
-    private readonly IAuthService _authService;
+    private readonly IJwtService _jwtService;
     private readonly ILogger<UserService> _logger;
 
     public UserService(
-        AppDbContext dbContext,
-        ILogger<UserService> logger, ITokenService tokenService, IAuthService authService)
+        AppDbContext dbContext, 
+        IJwtService jwtService,
+        ILogger<UserService> logger)
     {
         _dbContext = dbContext;
+        _jwtService = jwtService;
         _logger = logger;
-        _tokenService = tokenService;
-        _authService = authService;
     }
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
     {
+        if (registerDto == null)
+        {
+            throw new ArgumentNullException(nameof(registerDto));
+        }
+
+        if (string.IsNullOrWhiteSpace(registerDto.Password) || registerDto.Password.Length < 6)
+        {
+            throw new ArgumentException("Password must be at least 6 characters long");
+        }
+        
+        var userExists = await _dbContext.Users
+            .AnyAsync(x => x.Username == registerDto.Username);
+        if (userExists)
+        {
+            throw new InvalidOperationException("User already exists");
+        }
+        
+        var user = new User
+        {
+            Username = registerDto.Username.Trim(),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
+        };
+        
+        var refreshToken = await _jwtService.GenerateRefreshTokenAsync(user);
+        user.RefreshTokens.Add(refreshToken);
+        var accessToken = _jwtService.GenerateAccessToken(user);
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
         try
         {
-            var userExists = await _dbContext.Users
-                .AnyAsync(x => x.Username == registerDto.Username);
-
-            if (userExists)
-            {
-                throw new ApplicationException("User already exists");
-            }
-
-            var user = new User
-            {
-                Id = Guid.NewGuid(),
-                Username = registerDto.Username,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
-            };
-            
-             var accessToken = _tokenService.GenerateAccessToken(user);
-             var refreshToken = await _tokenService.GenerateAndSaveRefreshTokenAsync(user);
-             user.RefreshTokens.Add(refreshToken);
             _dbContext.Users.Add(user);
             await _dbContext.SaveChangesAsync();
-            
+            await transaction.CommitAsync();
+        
             return new AuthResponseDto
             {
                 AccessToken = accessToken,
-                ExpiresAt = DateTime.UtcNow.AddHours(1),
                 RefreshToken = refreshToken.Token,
-                RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7)
+                ExpiresAt = DateTime.UtcNow.AddHours(1),
+                RefreshTokenExpiresAt = refreshToken.Expires
             };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during registration");
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Error during user registration");
             throw;
         }
     }
 
     public async Task<AuthResponseDto> LoginAsync(LoginDto loginDto)
     {
+        if (loginDto == null)
+        {
+            throw new ArgumentNullException(nameof(loginDto));
+        }
+        var delayTask = Task.Delay(200); 
+
         try
         {
             var user = await _dbContext.Users
+                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Username == loginDto.Username);
+            await delayTask;
 
-            if (user == null)
+            if (user == null || !BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash))
             {
-                throw new ApplicationException("User not found");
-            }
-
-            if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, user.PasswordHash))
-            {
-                throw new ApplicationException("Invalid password");
+                throw new SecurityException("Invalid credentials");
             }
             
-            var refreshToken = await _dbContext.RefreshTokens.FirstOrDefaultAsync(rt=>rt.UserId == user.Id);
-            if (refreshToken == null)
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+            try
             {
-                throw new ApplicationException("Refresh token not found");
-            }
+                await _jwtService.InvalidateUserTokensAsync(user.Id);
+                var accessToken = _jwtService.GenerateAccessToken(user);
+                var refreshToken = await _jwtService.GenerateRefreshTokenAsync(user);
+                
+                _dbContext.RefreshTokens.Add(refreshToken);
+                await _dbContext.SaveChangesAsync();
+                
+                await transaction.CommitAsync();
+                _logger.LogInformation("User logged in: {Username}", user.Username);
 
-            var tokenDto = new TokenDto
+                return new AuthResponseDto
+                {
+                    AccessToken = accessToken,
+                    RefreshToken = refreshToken.Token,
+                    ExpiresAt = DateTime.UtcNow.AddHours(1),
+                    RefreshTokenExpiresAt = refreshToken.Expires
+                };
+            }
+            catch
             {
-                Access_token = _tokenService.GenerateAccessToken(user),
-                Refresh_token = refreshToken
-            };
-            var refreshTokenChanged = await _authService.RefreshTokenAsync(tokenDto);
-            
-            return new AuthResponseDto
-            {
-                AccessToken = refreshTokenChanged.Access_token,
-                ExpiresAt = DateTime.UtcNow.AddHours(1),
-                RefreshToken = refreshTokenChanged.Refresh_token.Token,
-                RefreshTokenExpiresAt = refreshToken.Expires
-            };
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during login");
+            _logger.LogWarning(ex, "Failed login attempt for {Username}", loginDto.Username);
             throw;
         }
     }

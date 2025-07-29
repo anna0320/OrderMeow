@@ -10,7 +10,7 @@ namespace OrderMeow.Infrastructure.Services;
 
 public class OrderService: IOrderService
 {
-    private readonly AppDbContext  _dbContext;
+    private readonly AppDbContext _dbContext;
     private readonly IMessageQueueService _messageQueueService;
 
     public OrderService(IMessageQueueService messageQueueService, AppDbContext dbContext)
@@ -23,30 +23,44 @@ public class OrderService: IOrderService
     {
         var order = new Order
         {
-            Id = Guid.NewGuid(),
             Title = orderDto.Title,
             Description = orderDto.Description,
             CreatedAt = DateTime.UtcNow,
             UserId = userId,
             Status = OrderStatus.Created
         };
-        _dbContext.Orders.Add(order);
-        await _dbContext.SaveChangesAsync();
-        var message = new OrderCreatedMessage
+        
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        try
         {
-            OrderId = order.Id,
-            UserId = order.UserId,
-            CreatedAt = order.CreatedAt,
-            Title = order.Title
-        };
-        await _messageQueueService.PublishOrderCreatedAsync(message);
-        return order.Id;
+            _dbContext.Orders.Add(order);
+            await _dbContext.SaveChangesAsync();
+
+            var message = new OrderCreatedMessage
+            {
+                OrderId = order.Id,
+                UserId = order.UserId,
+                CreatedAt = order.CreatedAt,
+                Title = order.Title
+            };
+
+            await _messageQueueService.PublishOrderCreatedAsync(message);
+            
+            await transaction.CommitAsync();
+            return order.Id;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<List<OrderResponseDto>> GetAllOrdersAsync(Guid userId)
     {
         return await _dbContext.Orders
-            .Where(x => x.UserId == userId)
+            .Where(o => o.UserId == userId)
+            .AsNoTracking()
             .Select(o => new OrderResponseDto
             {
                 Id = o.Id,
@@ -54,54 +68,66 @@ public class OrderService: IOrderService
                 Description = o.Description,
                 CreatedAt = o.CreatedAt,
                 Status = o.Status.ToString(),
-            }).ToListAsync();
+            })
+            .ToListAsync();
     }
 
     public async Task<OrderResponseDto?> GetOrderByIdAsync(Guid orderId, Guid userId)
     {
-        var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
-        return order == null
-            ? null
-            : new OrderResponseDto
+        return await _dbContext.Orders
+            .Where(o => o.Id == orderId && o.UserId == userId)
+            .AsNoTracking()
+            .Select(o => new OrderResponseDto
             {
-                Id = order.Id,
-                Title = order.Title,
-                Description = order.Description,
-                CreatedAt = order.CreatedAt,
-                Status = order.Status.ToString(),
-            };
+                Id = o.Id,
+                Title = o.Title,
+                Description = o.Description,
+                CreatedAt = o.CreatedAt,
+                Status = o.Status.ToString(),
+            })
+            .FirstOrDefaultAsync();
     }
 
     public async Task UpdateOrderAsync(OrderDto orderDto, Guid orderId, Guid userId)
     {
-        var  order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+        var order = await _dbContext.Orders
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+            
         if (order == null)
         {
             throw new Exception("Order not found");
         }
+
         order.Title = orderDto.Title;
         order.Description = orderDto.Description;
+
         await _dbContext.SaveChangesAsync();
     }
 
     public async Task DeleteOrderAsync(Guid orderId, Guid userId)
     {
-        var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+        var order = await _dbContext.Orders
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+            
         if (order == null)
         {
             throw new Exception("Order not found");
         }
+
         _dbContext.Orders.Remove(order);
         await _dbContext.SaveChangesAsync();
     }
 
     public async Task SetOrderStatusAsync(Guid orderId, Guid userId, OrderStatus status)
     {
-        var order = await _dbContext.Orders.FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+        var order = await _dbContext.Orders
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+            
         if (order == null)
         {
             throw new Exception("Order not found");
         }
+
         order.Status = status;
         await _dbContext.SaveChangesAsync();
     }
