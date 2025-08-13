@@ -12,11 +12,16 @@ public class OrderService: IOrderService
 {
     private readonly AppDbContext _dbContext;
     private readonly IMessageQueueService _messageQueueService;
+    private readonly ICacheService _cacheService;
 
-    public OrderService(IMessageQueueService messageQueueService, AppDbContext dbContext)
+    public OrderService(
+        IMessageQueueService messageQueueService, 
+        AppDbContext dbContext, 
+        ICacheService cacheService)
     {
         _messageQueueService = messageQueueService;
         _dbContext = dbContext;
+        _cacheService = cacheService;
     }
 
     public async Task<Guid> CreateOrderAsync(OrderDto orderDto, Guid userId)
@@ -45,6 +50,7 @@ public class OrderService: IOrderService
             };
 
             await _messageQueueService.PublishOrderCreatedAsync(message);
+            await _cacheService.RemoveAsync(_cacheService.GetCacheKey(userId));
             
             await transaction.CommitAsync();
             return order.Id;
@@ -58,7 +64,14 @@ public class OrderService: IOrderService
 
     public async Task<List<OrderResponseDto>> GetAllOrdersAsync(Guid userId)
     {
-        return await _dbContext.Orders
+        var cacheKey = _cacheService.GetCacheKey(userId);
+        var cachedOrders = await _cacheService.GetAsync<List<OrderResponseDto>>(cacheKey);
+        if (cachedOrders is not null)
+        {
+            return cachedOrders;
+        }
+        
+        var orders =  await _dbContext.Orders
             .Where(o => o.UserId == userId)
             .AsNoTracking()
             .Select(o => new OrderResponseDto
@@ -70,6 +83,8 @@ public class OrderService: IOrderService
                 Status = o.Status.ToString(),
             })
             .ToListAsync();
+        await _cacheService.SetAsync(cacheKey, orders, TimeSpan.FromHours(1));
+        return orders;
     }
 
     public async Task<OrderResponseDto?> GetOrderByIdAsync(Guid orderId, Guid userId)
@@ -90,10 +105,8 @@ public class OrderService: IOrderService
 
     public async Task UpdateOrderAsync(OrderDto orderDto, Guid orderId, Guid userId)
     {
-        var order = await _dbContext.Orders
-            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
-            
-        if (order == null)
+        var order = await _dbContext.Orders.FindAsync(orderId);
+        if (order == null ||  order.UserId != userId)
         {
             throw new Exception("Order not found");
         }
@@ -102,33 +115,34 @@ public class OrderService: IOrderService
         order.Description = orderDto.Description;
 
         await _dbContext.SaveChangesAsync();
+        await _cacheService.RemoveAsync(_cacheService.GetCacheKey(userId));
     }
 
     public async Task DeleteOrderAsync(Guid orderId, Guid userId)
     {
-        var order = await _dbContext.Orders
-            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
-            
-        if (order == null)
+        var order = await _dbContext.Orders.FindAsync(orderId);
+        if (order == null || order.UserId != userId)
         {
             throw new Exception("Order not found");
         }
 
         _dbContext.Orders.Remove(order);
         await _dbContext.SaveChangesAsync();
+        await _cacheService.RemoveAsync(_cacheService.GetCacheKey(userId));
     }
 
     public async Task SetOrderStatusAsync(Guid orderId, Guid userId, OrderStatus status)
     {
-        var order = await _dbContext.Orders
-            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
-            
-        if (order == null)
+        var affectedRows = await _dbContext.Orders
+            .Where(o=>o.Id == orderId && o.UserId == userId)
+            .ExecuteUpdateAsync(s=> 
+                s.SetProperty(o=>o.Status, status));
+        
+        if (affectedRows == 0)
         {
             throw new Exception("Order not found");
         }
-
-        order.Status = status;
-        await _dbContext.SaveChangesAsync();
+        
+        await _cacheService.RemoveAsync(_cacheService.GetCacheKey(userId));
     }
 }

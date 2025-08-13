@@ -17,9 +17,9 @@ if (jwtSettings == null || string.IsNullOrEmpty(jwtSettings.SecretKey))
 {
     throw new InvalidOperationException("JWT settings are not configured properly.");
 }
-builder.Services.AddSingleton(jwtSettings);
-
-builder.Services.AddAuthentication(options =>
+builder.Services
+    .AddSingleton(jwtSettings)
+    .AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -61,55 +61,61 @@ builder.Services.AddAuthentication(options =>
                 return context.Response.WriteAsync(result);
             }
         };
-
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("UserOrAdmin", policy => 
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("UserOrAdmin", policy => 
         policy.RequireRole(nameof(RoleType.User), nameof(RoleType.Admin)));
-});
 
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IOrderService, OrderService>();
-builder.Services.AddScoped<IJwtService, JwtService>();
-builder.Services.AddScoped<IMessageQueueService, RabbitMqService>();
+builder.Services
+    .AddScoped<IUserService, UserService>()
+    .AddScoped<IOrderService, OrderService>()
+    .AddScoped<IJwtService, JwtService>()
+    .AddScoped<IMessageQueueService, RabbitMqService>()
+    .AddScoped<ICacheService, CacheService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddControllers();
 
-builder.Services.Configure<IISServerOptions>(options =>
-{
-    options.AutomaticAuthentication = false;
-});
-builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
-builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    var jwtSecurityScheme = new OpenApiSecurityScheme
-    {
-        In = ParameterLocation.Header,
-        Description = "Please insert JWT with Bearer into field",
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        Reference = new OpenApiReference
+builder.Services
+    .Configure<IISServerOptions>(options =>
         {
-            Type = ReferenceType.SecurityScheme,
-            Id = JwtBearerDefaults.AuthenticationScheme
-        }
-    };
-    c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement()
+            options.AutomaticAuthentication = false;
+        })
+    .Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"))
+    .AddStackExchangeRedisCache(options =>
     {
-        {jwtSecurityScheme, Array.Empty<string>()}
+        options.Configuration =  builder.Configuration.GetConnectionString("Redis");
+        options.InstanceName = "OrderMeow_";
+    })
+
+    .AddEndpointsApiExplorer()
+    .AddSwaggerGen(c =>
+    {
+        var jwtSecurityScheme = new OpenApiSecurityScheme
+        {
+            In = ParameterLocation.Header,
+            Description = "Please insert JWT with Bearer into field",
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Reference = new OpenApiReference
+            {
+                Type = ReferenceType.SecurityScheme,
+                Id = JwtBearerDefaults.AuthenticationScheme
+            }
+        };
+        c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement()
+        {
+            {
+                jwtSecurityScheme, Array.Empty<string>()
+            }
+        });
     });
-});
 
 var app = builder.Build();
 
@@ -134,9 +140,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
+app
+    .UseHttpsRedirection()
+    .UseAuthentication()
+    .UseAuthorization();
+
 app.MapControllers();
 
 app.Run();
