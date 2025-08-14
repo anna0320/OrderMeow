@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrderMeow.Infrastructure", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrderMeow.Core", "OrderMeow.Core\OrderMeow.Core.csproj", "{36C33069-647A-46F4-A742-2D7A2CBBA96D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrderMeow.Tests", "OrderMeow.Tests\OrderMeow.Tests.csproj", "{21B70411-6A2C-401D-B724-1A893558D0B0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{36C33069-647A-46F4-A742-2D7A2CBBA96D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36C33069-647A-46F4-A742-2D7A2CBBA96D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36C33069-647A-46F4-A742-2D7A2CBBA96D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{21B70411-6A2C-401D-B724-1A893558D0B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{21B70411-6A2C-401D-B724-1A893558D0B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{21B70411-6A2C-401D-B724-1A893558D0B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{21B70411-6A2C-401D-B724-1A893558D0B0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
