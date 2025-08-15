@@ -68,13 +68,6 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("UserOrAdmin", policy => 
         policy.RequireRole(nameof(RoleType.User), nameof(RoleType.Admin)));
 
-builder.Services
-    .AddScoped<IUserService, UserService>()
-    .AddScoped<IOrderService, OrderService>()
-    .AddScoped<IJwtService, JwtService>()
-    .AddScoped<IMessageQueueService, RabbitMqService>()
-    .AddScoped<ICacheService, CacheService>();
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddControllers();
@@ -85,11 +78,23 @@ builder.Services
             options.AutomaticAuthentication = false;
         })
     .Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"))
+    .Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"))
+    .AddMemoryCache(options =>
+    {
+        options.SizeLimit = 512;
+        options.CompactionPercentage = 0.3;
+    })
     .AddStackExchangeRedisCache(options =>
     {
         options.Configuration =  builder.Configuration.GetConnectionString("Redis");
         options.InstanceName = "OrderMeow_";
     })
+    
+    .AddScoped<IUserService, UserService>()
+    .AddScoped<IOrderService, OrderService>()
+    .AddScoped<IJwtService, JwtService>()
+    .AddScoped<IMessageQueueService, RabbitMqService>()
+    .AddScoped<ICacheService, CacheService>()
 
     .AddEndpointsApiExplorer()
     .AddSwaggerGen(c =>

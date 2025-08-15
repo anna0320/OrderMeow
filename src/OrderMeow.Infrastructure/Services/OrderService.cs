@@ -50,7 +50,7 @@ public class OrderService: IOrderService
             };
 
             await _messageQueueService.PublishOrderCreatedAsync(message);
-            await _cacheService.RemoveAsync(_cacheService.GetCacheKey(userId));
+            await InvalidateUserOrdersCache(userId, order.Id);
             
             await transaction.CommitAsync();
             return order.Id;
@@ -65,13 +65,21 @@ public class OrderService: IOrderService
     public async Task<List<OrderResponseDto>> GetAllOrdersAsync(Guid userId)
     {
         var cacheKey = _cacheService.GetCacheKey(userId);
-        var cachedOrders = await _cacheService.GetAsync<List<OrderResponseDto>>(cacheKey);
-        if (cachedOrders is not null)
+        var response = await _cacheService.GetOrCreateAsync(
+            cacheKey,
+            async () => await GetOrdersFromDbAsync(userId),
+            TimeSpan.FromMinutes(5),
+            TimeSpan.FromMinutes(30));
+        if (response is null)
         {
-            return cachedOrders;
+            throw new NullReferenceException();
         }
-        
-        var orders =  await _dbContext.Orders
+        return response;
+    }
+
+    private async Task<List<OrderResponseDto>> GetOrdersFromDbAsync(Guid userId)
+    {
+        return await _dbContext.Orders
             .Where(o => o.UserId == userId)
             .AsNoTracking()
             .Select(o => new OrderResponseDto
@@ -81,26 +89,18 @@ public class OrderService: IOrderService
                 Description = o.Description,
                 CreatedAt = o.CreatedAt,
                 Status = o.Status.ToString(),
-            })
-            .ToListAsync();
-        await _cacheService.SetAsync(cacheKey, orders, TimeSpan.FromHours(1));
-        return orders;
+            }).ToListAsync();
     }
 
-    public async Task<OrderResponseDto?> GetOrderByIdAsync(Guid orderId, Guid userId)
+    public async Task<OrderResponseDto> GetOrderByIdAsync(Guid orderId, Guid userId)
     {
-        return await _dbContext.Orders
-            .Where(o => o.Id == orderId && o.UserId == userId)
-            .AsNoTracking()
-            .Select(o => new OrderResponseDto
-            {
-                Id = o.Id,
-                Title = o.Title,
-                Description = o.Description,
-                CreatedAt = o.CreatedAt,
-                Status = o.Status.ToString(),
-            })
-            .FirstOrDefaultAsync();
+        var response = await GetAllOrdersAsync(userId);
+        var order = response.FirstOrDefault(o => o.Id == orderId);
+        if (order is null)
+        {
+            throw new Exception("Order not found");
+        }
+        return order;
     }
 
     public async Task UpdateOrderAsync(OrderDto orderDto, Guid orderId, Guid userId)
@@ -115,7 +115,7 @@ public class OrderService: IOrderService
         order.Description = orderDto.Description;
 
         await _dbContext.SaveChangesAsync();
-        await _cacheService.RemoveAsync(_cacheService.GetCacheKey(userId));
+        await InvalidateUserOrdersCache(userId, orderId);
     }
 
     public async Task DeleteOrderAsync(Guid orderId, Guid userId)
@@ -144,5 +144,16 @@ public class OrderService: IOrderService
         }
         
         await _cacheService.RemoveAsync(_cacheService.GetCacheKey(userId));
+    }
+    
+    private async Task InvalidateUserOrdersCache(Guid userId, Guid? orderId = null)
+    {
+        var userOrdersKey = _cacheService.GetCacheKey(userId);
+        await _cacheService.RemoveAsync(userOrdersKey);
+        if (orderId.HasValue)
+        {
+            var singleOrderKey = $"order_{orderId.Value}_{userId}";
+            await _cacheService.RemoveAsync(singleOrderKey);
+        }
     }
 }
