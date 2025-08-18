@@ -28,7 +28,7 @@ public class CacheService:ICacheService
             return default;
         }
         var value = JsonSerializer.Deserialize<T>(json);
-        _memoryCache.Set(key, value, TimeSpan.FromMinutes(1));
+        _memoryCache.Set(key, value, new MemoryCacheEntryOptions().SetSize(1).SetAbsoluteExpiration(TimeSpan.FromMinutes(1)));
         return value;
     }
 
@@ -40,7 +40,7 @@ public class CacheService:ICacheService
             options.SetAbsoluteExpiration(slidingExpiration.Value);
         }
         var json = JsonSerializer.Serialize(value);
-        _memoryCache.Set(key, value, slidingExpiration ?? TimeSpan.FromMinutes(5));
+        _memoryCache.Set(key, value, new MemoryCacheEntryOptions().SetSize(1).SetSlidingExpiration(slidingExpiration ?? TimeSpan.FromMinutes(5)));
         await _cache.SetStringAsync(key, json, options);
     }
 
@@ -72,12 +72,12 @@ public class CacheService:ICacheService
                     {
                         if (reason == EvictionReason.Expired)
                         {
-                            _ = Task.Run(() => GetOrCreateAsync<T>(key, factory, memoryExpiration, slidingExpiration));
+                            _ = Task.Run(() => GetOrCreateAsync(key, factory, memoryExpiration, slidingExpiration));
                         }
                     }
                 }
             }
-        });
+        }.SetSize(1));
         return result;
     }
 }

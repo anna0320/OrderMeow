@@ -17,6 +17,25 @@ if (jwtSettings == null || string.IsNullOrEmpty(jwtSettings.SecretKey))
 {
     throw new InvalidOperationException("JWT settings are not configured properly.");
 }
+
+builder.Services
+    .Configure<IISServerOptions>(options =>
+    {
+        options.AutomaticAuthentication = false;
+    })
+    .Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"))
+    .Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"))
+    .AddMemoryCache(options =>
+    {
+        options.SizeLimit = 512;
+        options.CompactionPercentage = 0.3;
+    })
+    .AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = builder.Configuration.GetConnectionString("Redis");
+        options.InstanceName = "OrderMeow_";
+    });
+    
 builder.Services
     .AddSingleton(jwtSettings)
     .AddAuthentication(options =>
@@ -72,31 +91,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddControllers();
 
-builder.Services
-    .Configure<IISServerOptions>(options =>
-        {
-            options.AutomaticAuthentication = false;
-        })
-    .Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"))
-    .Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"))
-    .AddMemoryCache(options =>
-    {
-        options.SizeLimit = 512;
-        options.CompactionPercentage = 0.3;
-    })
-    .AddStackExchangeRedisCache(options =>
-    {
-        options.Configuration =  builder.Configuration.GetConnectionString("Redis");
-        options.InstanceName = "OrderMeow_";
-    })
-    
-    .AddScoped<IUserService, UserService>()
+
+builder.Services.AddScoped<IUserService, UserService>()
     .AddScoped<IOrderService, OrderService>()
     .AddScoped<IJwtService, JwtService>()
     .AddScoped<IMessageQueueService, RabbitMqService>()
-    .AddScoped<ICacheService, CacheService>()
+    .AddScoped<ICacheService, CacheService>();
 
-    .AddEndpointsApiExplorer()
+
+builder.Services.AddEndpointsApiExplorer()
     .AddSwaggerGen(c =>
     {
         var jwtSecurityScheme = new OpenApiSecurityScheme
@@ -122,7 +125,21 @@ builder.Services
         });
     });
 
+
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app
+    .UseHttpsRedirection()
+    .UseAuthentication()
+    .UseAuthorization();
+
+app.MapControllers();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -138,18 +155,5 @@ using (var scope = app.Services.CreateScope())
         await dbContext.SaveChangesAsync();
     }
 }
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app
-    .UseHttpsRedirection()
-    .UseAuthentication()
-    .UseAuthorization();
-
-app.MapControllers();
 
 app.Run();
