@@ -9,6 +9,7 @@ using OrderMeow.Core.Interfaces;
 using OrderMeow.Infrastructure.Config;
 using OrderMeow.Infrastructure.Persistence;
 using OrderMeow.Infrastructure.Services;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -128,16 +129,19 @@ builder.Services.AddEndpointsApiExplorer()
 
 var app = builder.Build();
 
+app.UseAuthentication()
+    .UseAuthorization();
+
+app.UseHttpMetrics();
+app.MapMetrics();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app
-    .UseHttpsRedirection()
-    .UseAuthentication()
-    .UseAuthorization();
+app.UseHttpsRedirection();
 
 app.MapControllers();
 
